@@ -7,6 +7,7 @@ import getpass
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+from multiprocessing import Process
 
 # Gets the directory of where the file is being ran from
 if os.getenv('PIN_ALIGN_ROOT') != os.path.dirname(os.path.realpath(__file__)):
@@ -25,6 +26,13 @@ parser.add_argument('IMG_90', help='Input image at 90 degrees')
 parser.add_argument('-d', '--debug', action='store_true',
                     help='Turn debug mode on')
 args = parser.parse_args()
+
+fname = args.IMG_0.split('/')[-1]
+fbase = fname.split('.')[0]
+
+user_name = getpass.getuser()
+tmp_dir = os.path.join(os.getcwd(), user_name + '_pin_align_' + str(random.randint(11111, 99999)))
+os.system("mkdir -p " + tmp_dir)
 
 def pin_align_prep(image):
     # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
@@ -51,22 +59,54 @@ def tilt_check(img_0_pin_base, img_90_pin_base):
     alpha = 0.5
     beta = 1.0 - alpha
     combined_img = cv2.addWeighted(img_0_pin_base, alpha, img_90_pin_base, beta, 0)
-    tilt_check_top = combined_img[TILT_CHECK_TOP, TILT_CHECK_ROI_WIDTH]
-    tilt_check_bottom = combined_img[TILT_CHECK_BOTTOM, TILT_CHECK_ROI_WIDTH]
-    plt.imshow(tilt_check_top, cmap='gray')
     
-    cv2.imwrite('test_top.jpg', tilt_check_top)
-    cv2.imwrite('test_bottom.jpg', tilt_check_bottom)
+    height = TILT_CHECK_TOP_Y2 - TILT_CHECK_TOP_Y1    
+    
+    tilt_check_x1 = max(PIN_BASE_X1, TILT_CHECK_X1) - min(PIN_BASE_X1, TILT_CHECK_X1)
+    tilt_check_x2 = max(PIN_BASE_X2, TILT_CHECK_X2) - min(PIN_BASE_X2, TILT_CHECK_X2)
+
+    if tilt_check_x2 == 0:
+        tilt_check_x2 = None
+
+    tilt_check_top_y1 = TILT_CHECK_TOP_Y1 - DEFAULT_ROI_Y1
+    tilt_check_top_y2 = tilt_check_top_y1 + height
+    tilt_check_top = combined_img[tilt_check_top_y1:tilt_check_top_y2, tilt_check_x1:tilt_check_x2]
+    tilt_top_filename = os.path.join(tmp_dir, 'img_tilt_check_top.jpg')
+    
+    tilt_check_bottom_y1 = TILT_CHECK_BOTTOM_Y1 - DEFAULT_ROI_Y1
+    tilt_check_bottom_y2 = tilt_check_bottom_y1 + height
+    tilt_check_bottom = combined_img[tilt_check_bottom_y1:tilt_check_bottom_y2, tilt_check_x1:tilt_check_x2]
+    tilt_bottom_filename = os.path.join(tmp_dir, 'img_tilt_check_bottom.jpg')
+    
+    if args.debug:
+        cv2.imwrite(tilt_top_filename, tilt_check_top)
+        cv2.imwrite(tilt_bottom_filename, tilt_check_bottom)
+    
+    if not np.all(tilt_check_top == 255) or not np.all(tilt_check_bottom == 255):
+        sys.exit('CAP TILTED')
 
 def pin_check(img_0_pin, img_90_pin):
-    pass
+    alpha = 0.5
+    beta = 1.0 - alpha
+    combined_img = cv2.addWeighted(img_0_pin, alpha, img_90_pin, beta, 0)
+    height = PIN_CHECK_TOP_Y2 - PIN_CHECK_TOP_Y1
+    
+    pin_check_top_y1 = PIN_CHECK_TOP_Y1 - DEFAULT_ROI_Y1
+    pin_check_top_y2 = pin_check_top_y1 + height
+    pin_check_top = combined_img[pin_check_top_y1:pin_check_top_y2]
+    pin_top_filename = os.path.join(tmp_dir, 'img_pin_check_top.jpg')
 
-fname = args.IMG_0.split('/')[-1]
-fbase = fname.split('.')[0]
+    pin_check_bottom_y1 = PIN_CHECK_BOTTOM_Y1 - DEFAULT_ROI_Y1
+    pin_check_bottom_y2 = pin_check_bottom_y1 + height
+    pin_check_bottom = combined_img[pin_check_bottom_y1:pin_check_bottom_y2]
+    pin_bottom_filename = os.path.join(tmp_dir, 'img_pin_check_bottom.jpg')
 
-user_name = getpass.getuser()
-tmp_dir = os.path.join(os.getcwd(), user_name + '_pin_align_' + str(random.randint(11111, 99999)))
-os.system("mkdir -p " + tmp_dir)
+    if args.debug:
+        cv2.imwrite(pin_top_filename, pin_check_top)
+        cv2.imwrite(pin_bottom_filename, pin_check_bottom)
+    
+    if not np.all(pin_check_top == 255) or not np.all(pin_check_bottom == 255):
+        sys.exit('PIN MISSING')
 # os.system("chmod 777 " + tmp_dir)
 
 print('0 degree: {}\n90 degree: {}\nFiles in: {}'.format(args.IMG_0, args.IMG_90, tmp_dir))
@@ -88,4 +128,11 @@ cv2.imwrite(os.path.join(tmp_dir, 'img_90_pin_tip.jpg'), img_90_pin_tip)
 cv2.imwrite(os.path.join(tmp_dir, 'img_90_pin_body.jpg'), img_90_pin_body)
 cv2.imwrite(os.path.join(tmp_dir, 'img_90_pin_base.jpg'), img_90_pin_base)
 
-tilt_check(img_0_pin_base, img_90_pin_base)
+p1 = Process(target=tilt_check, args=(img_0_pin_base, img_90_pin_base,))
+p2 = Process(target=pin_check, args=(img_0_pin_body, img_90_pin_body,))
+
+p1.start()
+p2.start()
+
+p1.join()
+p2.join()

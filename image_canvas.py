@@ -6,24 +6,29 @@ from tkinter import *
 from PIL import Image, ImageTk
 import sys
 
-class ScreenCrop(Frame):
+
+class Image_Canvas():
     def __init__(self, master):
-        # Frame.__init__(self, master=None)
         self.master = master
         self.x = self.y = 0
         self.curX = self.curY = 0
         self.im_in = cv2.imread(sys.argv[1], 0)
         self.im_height, self.im_width = self.im_in.shape
+
         self.show_crop = None
         self.new_crop_edges = None
         self.whole_crop = None
+        self.rect = None
+        self.start_x = None
+        self.start_y = None
+
         self.self_crop_on = False
         self.auto_crop_on = False
         self.line = False
         self.big_box = False
-        # print(self.height, self.width)
-
+        self.small_box = False
         self.oval_list = [False, False]
+
         self.crop_edge_list = []
         self.oval_count = 0
 
@@ -31,20 +36,9 @@ class ScreenCrop(Frame):
             self.master, width=self.im_width, height=self.im_height, border=1, relief="sunken")
         self.screen_canvas.pack(side="left", fill="both", expand=True)
 
-        self.rect = None
-
-        self.start_x = None
-        self.start_y = None
-
         self.im = Image.fromarray(self.im_in)
-        try:
-            self.image_dpi = self.im['dpi']
-            self.pixel_per_mm = 25.4 / self.image_dpi[0]
-        except Exception:
-            pass
-        self.wazil, self.lard = self.im.size
         self.tk_im = ImageTk.PhotoImage(self.im)
-        self.screen_canvas.create_image(0, 0, anchor="nw", image=self.tk_im)
+        self.screen_canvas.create_image(0, 0, anchor='nw', image=self.tk_im)
 
     def get_image(self, X1, X2, Y1, Y2):
         image = self.im_in[Y1:Y2, X1:X2]
@@ -99,7 +93,9 @@ class ScreenCrop(Frame):
             self.screen_canvas.delete(self.line)
         if self.big_box:
             self.screen_canvas.delete(self.big_box)
-        
+        if self.small_box:
+            self.screen_canvas.delete(self.small_box)
+
         self.show_crop = self.screen_canvas.create_rectangle(
             X1, Y1, X2, Y2, fill='', outline='red')
         return self.show_crop
@@ -107,6 +103,40 @@ class ScreenCrop(Frame):
     def create_big_box(self, X1, Y1, X2, Y2):
         self.big_box = self.screen_canvas.create_rectangle(
             X1, Y1, X2, Y2, fill='', outline='red')
+
+    def create_small_box(self, X, Y):
+        X1 = X - 15
+        X2 = X + 15
+        Y1 = Y - 15
+        Y2 = Y + 15
+        self.small_box = self.screen_canvas.create_rectangle(
+            X1, Y1, X2, Y2, fill='', outline='red')
+
+    def center_pin_image(self, X, Y):
+        X1 = X - 15
+        X2 = X + 15
+        Y1 = Y - 15
+        Y2 = Y + 15
+
+        self.get_image(X1, X2, Y1, Y2)
+        small_box_edge = self.image_bw
+
+        for col in range(small_box_edge.shape[0]):
+            black_pixels = []
+            if 0 in small_box_edge[:, col]:
+                for row in range(len(small_box_edge[:, col])):
+                    if small_box_edge[row, col] == 0:
+                        black_pixels.append([col,row])
+            if len(black_pixels) >= 3:
+                middle_index = len(black_pixels) // 2
+                pixel_location = black_pixels[middle_index]
+                break
+
+        print(pixel_location)
+        new_x = X + (pixel_location[0] - 15)
+        new_y = Y + (pixel_location[1] - 15)
+
+        return [new_x, new_y]
 
     def delete_crop_rect(self, rect):
         self.screen_canvas.delete(rect)
@@ -122,7 +152,8 @@ class ScreenCrop(Frame):
             self.screen_canvas.config(cursor='cross')
             self.screen_canvas.bind("<ButtonPress-1>", self.on_button_press)
             self.screen_canvas.bind("<B1-Motion>", self.on_move_press)
-            self.screen_canvas.bind("<ButtonRelease-1>", self.on_button_release)
+            self.screen_canvas.bind(
+                "<ButtonRelease-1>", self.on_button_release)
             self.self_crop_on = True
 
     def create_crop_edge(self, X1, X2, Y1, Y2, TOP, LEFT):
@@ -145,22 +176,27 @@ class ScreenCrop(Frame):
     def auto_crop_start(self, y1_value_label, x1_value_label, x2_value_label, y2_value_label,
                         x1_value_in, y1_value_in, x2_value_in, y2_value_in):
         if self.auto_crop_on:
-            self.screen_canvas.config(cursor='')
-            self.screen_canvas.unbind("<ButtonPress-1>")
-            x1_value_label.config(text='X1', font=('helvetica', 10))
-            y1_value_label.config(text='Y1', font=('helvetica', 10))
-            x2_value_label.config(text='X2', font=('helvetica', 10))
-            y2_value_label.config(text='Y2', font=('helvetica', 10))
-            self.auto_crop_on = False
+            self.auto_crop_stop(y1_value_label, x1_value_label,
+                                x2_value_label, y2_value_label)
         elif not self.auto_crop_on:
             self.screen_canvas.config(cursor='cross')
-            self.screen_canvas.bind("<ButtonPress-1>", lambda event: self.auto_crop_press(event, x1_value_in, y1_value_in, x2_value_in, y2_value_in))
+            self.screen_canvas.bind("<ButtonPress-1>", lambda event: self.auto_crop_press(
+                event, x1_value_in, y1_value_in, x2_value_in, y2_value_in))
             x1_value_label.config(text='Pin X', font=('helvetica', 10))
             y1_value_label.config(text='Pin Y', font=('helvetica', 10))
             x2_value_label.config(text='Glue X', font=('helvetica', 10))
             y2_value_label.config(text='Glue Y', font=('helvetica', 10))
             self.auto_crop_on = True
-    
+
+    def auto_crop_stop(self, y1_value_label, x1_value_label, x2_value_label, y2_value_label):
+        self.screen_canvas.config(cursor='')
+        self.screen_canvas.unbind("<ButtonPress-1>")
+        x1_value_label.config(text='X1', font=('helvetica', 10))
+        y1_value_label.config(text='Y1', font=('helvetica', 10))
+        x2_value_label.config(text='X2', font=('helvetica', 10))
+        y2_value_label.config(text='Y2', font=('helvetica', 10))
+        self.auto_crop_on = False
+
     def auto_crop_press(self, event, x1_value_in, y1_value_in, x2_value_in, y2_value_in):
         self.auto_press_x = event.x
         self.auto_press_y = event.y
@@ -174,7 +210,8 @@ class ScreenCrop(Frame):
         if self.oval_count == 0:
             if self.oval_list[0]:
                 self.screen_canvas.delete(self.oval_list[self.oval_count])
-            self.new_circle = self.screen_canvas.create_oval(X1, Y1, X2, Y2,fill='green')
+            self.new_circle = self.screen_canvas.create_oval(
+                X1, Y1, X2, Y2, fill='green')
             self.oval_list[0] = self.new_circle
             self.oval_count = 1
             x1_value_in.delete(0, 'end')
@@ -184,7 +221,8 @@ class ScreenCrop(Frame):
         elif self.oval_count == 1:
             if self.oval_list[1]:
                 self.screen_canvas.delete(self.oval_list[self.oval_count])
-            self.new_circle = self.screen_canvas.create_oval(X1, Y1, X2, Y2,fill='blue')
+            self.new_circle = self.screen_canvas.create_oval(
+                X1, Y1, X2, Y2, fill='blue')
             self.oval_list[1] = self.new_circle
             self.oval_count = 0
             x2_value_in.delete(0, 'end')
@@ -197,6 +235,6 @@ class ScreenCrop(Frame):
             self.screen_canvas.delete(self.line)
         except Exception:
             pass
-        self.line = self.screen_canvas.create_line(X, Y, A, B, fill='red', width=5)
+        self.line = self.screen_canvas.create_line(
+            X, Y, A, B, fill='red', width=4)
         return self.line
-        
