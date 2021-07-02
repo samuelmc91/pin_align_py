@@ -39,6 +39,27 @@ class Image_Canvas():
         self.im = Image.fromarray(self.im_in)
         self.tk_im = ImageTk.PhotoImage(self.im)
         self.screen_canvas.create_image(0, 0, anchor='nw', image=self.tk_im)
+    
+    def clear_canvas(self, on_off_list):
+        if self.small_box:
+            self.screen_canvas.delete(self.small_box)
+        if self.line:
+            self.screen_canvas.delete(self.line)
+        if self.big_box:
+            self.screen_canvas.delete(self.big_box)
+        if self.oval_list[0]:
+            self.screen_canvas.delete(self.oval_list[0])
+        if self.oval_list[1]:
+            self.screen_canvas.delete(self.oval_list[1])
+        
+        for i in range(len(on_off_list)):
+            if on_off_list[i][0]:
+                self.screen_canvas.delete(on_off_list[i][0])
+                on_off_list[i][0] = False
+            if on_off_list[i][1]:
+                self.screen_canvas.delete(on_off_list[i][1])
+                on_off_list[i][1] = False
+        return on_off_list
 
     def get_image(self, X1, X2, Y1, Y2):
         image = self.im_in[Y1:Y2, X1:X2]

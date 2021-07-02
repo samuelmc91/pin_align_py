@@ -15,13 +15,15 @@ from PIL import Image, ImageTk
 ############### Local Packages ###############
 from tool_tip import CreateToolTip
 from image_canvas import Image_Canvas
-import pin_align_config_amx
-from pin_align_config_amx import *
+import pin_align_config
+from pin_align_config import *
+from window_menu_bar import Window_Menu
 
 ############### Global Variables ###############
 global display_help_image_tk
 global display_help_image
 global on_off_list
+global auto_start_on_off
 
 ############### Rect & Edge ###############
 on_off_list = [[False, False],  # Pin Tip
@@ -35,7 +37,7 @@ on_off_list = [[False, False],  # Pin Tip
                [False, False]]  # Big Box
 
 root = os.getcwd()
-config_file_path = os.path.join(root, 'pin_align_config_amx.py')
+config_file_path = os.path.join(root, 'pin_align_config.py')
 
 
 def update():
@@ -53,7 +55,7 @@ def motion(event):
 
 
 def get_pin_crops():
-    inputs = importlib.reload(pin_align_config_amx)
+    inputs = importlib.reload(pin_align_config)
 
     pin_crops = [[inputs.DEFAULT_HEIGHT, inputs.PIN_TIP],
                  [inputs.DEFAULT_HEIGHT, inputs.PIN_BODY],
@@ -63,7 +65,9 @@ def get_pin_crops():
                  [inputs.PIN_CHECK_TOP, inputs.PIN_BODY],
                  [inputs.PIN_CHECK_BOTTOM, inputs.PIN_BODY],
                  [inputs.SMALL_BOX_HEIGHT, inputs.SMALL_BOX_WIDTH],
-                 [inputs.BIG_BOX_HEIGHT, inputs.BIG_BOX_WIDTH]]
+                 [inputs.BIG_BOX_HEIGHT, inputs.BIG_BOX_WIDTH],
+                 [inputs.X_CENTER, inputs.Y_CENTER],
+                 [inputs.INPUT_ROI_WIDTH, inputs.INPUT_ROI_HEIGHT]]
 
     return pin_crops
 
@@ -124,9 +128,15 @@ def crop_button_right(event, image_in_canvas, button_choice):
         image_in_canvas.delete_crop_edge(on_off_list[button_choice][1])
         on_off_list[button_choice][1] = False
 
+def clear_image_canvas(image_in_canvas):
+    global on_off_list
+    on_off_list = image_in_canvas.clear_canvas(on_off_list)
 
 def auto_start_button_left(event, image_in_canvas):
     global help_image_window
+    global auto_start_on_off
+    clear_image_canvas(image_in_canvas)
+    auto_start_on_off = True
     pin_crops = get_pin_crops()
     filename = os.path.join(os.getcwd(), 'display_help_image.jpg')
 
@@ -177,6 +187,9 @@ def change_config_file(config_file_path, line_text, new_value):
 
 def auto_submit_button_left(event, image_in_canvas):
     global help_image_window
+    global auto_start_on_off
+    config_x_cent, config_y_cent = get_pin_crops()[9]
+    config_default_width, config_default_height = get_pin_crops()[10]
     rtl = False
     ltr = False
     image_in_canvas.auto_crop_stop(
@@ -188,46 +201,45 @@ def auto_submit_button_left(event, image_in_canvas):
     change_config_file(config_file_path, 'MAX_X', str(max_x_in.get()))
     change_config_file(config_file_path, 'MAX_Y', str(max_y_in.get()))
     change_config_file(config_file_path, 'MAX_Z', str(max_z_in.get()))
-
     change_config_file(
-        config_file_path, 'DEFAULT_IMAGE_WIDTH_CENTER', str(width_center_in.get()))
-    change_config_file(
-        config_file_path, 'DEFAULT_IMAGE_HEIGHT_CENTER', str(height_center_in.get()))
+        config_file_path, 'DEFAULT_PIXELS_PER_MM', str(pixel_per_mm_box.get()))
 
     rod_length = pin_length_box.get().split(' ')[0]
     change_config_file(config_file_path, 'ROD_LENGTH', rod_length)
-    if axis_up_box.get() == 'Y Axis Up':
-        change_config_file(config_file_path, 'PIN_ALIGN_Y_UP', True)
-        change_config_file(config_file_path, 'PIN_ALIGN_Z_UP', False)
-    elif axis_up_box.get() == 'Z Axis Up':
-        change_config_file(config_file_path, 'PIN_ALIGN_Y_UP', False)
-        change_config_file(config_file_path, 'PIN_ALIGN_Z_UP', True)
 
-    try:
-        if int(x1_value_in.get()) < int(x2_value_in.get()):
-            # The cap is on the right and the pin goes to the left
-            rtl = True
-        elif int(x1_value_in.get()) > int(x2_value_in.get()):
-            ltr = True
-        if rtl:
+    change_config_file(config_file_path, 'X_POS_DIR',
+                       str("'" + x_pos_dir_in.get()) + "'")
+    change_config_file(config_file_path, 'Y_POS_DIR',
+                       str("'" + y_pos_dir_in.get()) + "'")
+    change_config_file(config_file_path, 'Z_POS_DIR',
+                       str("'" + z_pos_dir_in.get()) + "'")
+
+    if X_POS_DIR == 'LEFT':
+        # The cap is on the right and the pin goes to the left
+        rtl = True
+    elif X_POS_DIR == 'RIGHT':
+        ltr = True
+
+    if rtl:
+        if auto_start_on_off:
+            clear_image_canvas(image_in_canvas)
             X, Y = image_in_canvas.center_pin_image(
                 int(x1_value_in.get()), int(y1_value_in.get()))
             height = int(roi_height_in.get()) // 2
             change_config_file(
-                config_file_path, 'DEFAULT_IMAGE_WIDTH_CENTER', str(X))
+                config_file_path, 'X_CENTER', str(X))
             change_config_file(
-                config_file_path, 'DEFAULT_IMAGE_HEIGHT_CENTER', str(Y))
+                config_file_path, 'Y_CENTER', str(Y))
 
             A = int(x2_value_in.get())
             B = Y
-            
-            X1 = X - 20
+
+            X1 = X + int((pin_align_config.MIN_Z *
+                          pin_align_config.DEFAULT_PIXELS_PER_MM))
             X2 = A + 5
-            
-            pixels_pmm = (A - X) // int(rod_length)
-            pixel_per_mm_box.set(pixels_pmm)
-            change_config_file(
-                config_file_path, 'DEFAULT_PIXELS_PER_MM', str(pixel_per_mm_box.get()))
+
+            # pixels_pmm = (A - X) // int(rod_length)
+            # pixel_per_mm_box.set(pixels_pmm)
 
             info_canvas_top.delete(help_image_window)
             line = image_in_canvas.draw_new_line(X, Y, A, B)
@@ -240,75 +252,97 @@ def auto_submit_button_left(event, image_in_canvas):
                     print('Pin and glue misaligned, please try again')
             except Exception:
                 pass
+        elif (config_x_cent != int(x_center_in.get()) or
+              config_y_cent != int(y_center_in.get()) or
+              config_default_width != int(roi_width_in.get()) or 
+              config_default_height != int(roi_height_in.get())):
+            clear_image_canvas(image_in_canvas)
+            X, Y = int(x_center_in.get()), int(y_center_in.get())
+            height = int(roi_height_in.get()) // 2
+            
+            X1 = X + int((pin_align_config.MIN_Z *
+                          pin_align_config.DEFAULT_PIXELS_PER_MM))
+            X2 = X1 + int(roi_width_in.get())
 
-            # Y & B should be within x amount of degrees off
-            Y1 = Y - height
-            Y2 = Y + height
-            change_config_file(config_file_path, 'DEFAULT_ROI_Y1', Y1)
-            change_config_file(config_file_path, 'DEFAULT_ROI_Y2', Y2)
-
-            print('Y1: {}, Y2: {}, X1: {}, X2: {}'.format(Y1, Y2, X1, X2))
-
-            big_box = image_in_canvas.create_big_box(X1, Y1, X2, Y2)
-            change_config_file(config_file_path, 'BIG_BOX_X1', X1)
-            change_config_file(config_file_path, 'BIG_BOX_X2', X2)
-            change_config_file(config_file_path, 'BIG_BOX_Y1', Y1)
-            change_config_file(config_file_path, 'BIG_BOX_Y2', Y2)
-
-            small_box = image_in_canvas.create_small_box(X, Y)
-            change_config_file(config_file_path, 'BOX_X_IN', X)
-            change_config_file(config_file_path, 'BOX_Y_IN', Y)
-
-            new_crop = image_in_canvas.get_image(X1, X2, Y1, Y2)
-            current_crop_label.config(image=new_crop)
-            current_crop_title.config(
-                text='Current Crop', font=('helvetica', 14))
-
-            bbo = (X2 - X1) // 3
-
-            Xt = X1 + bbo
-            change_config_file(config_file_path, 'PIN_TIP_X1', X1)
-            change_config_file(config_file_path, 'PIN_TIP_X2', Xt)
-
-            Xb = Xt + bbo
-            change_config_file(config_file_path, 'PIN_BODY_X1', Xt)
-            change_config_file(config_file_path, 'PIN_BODY_X2', Xb)
-
-            Xc = Xb
-            change_config_file(config_file_path, 'PIN_BASE_X1', Xc)
-            change_config_file(config_file_path, 'PIN_BASE_X2', X2)
-
-            Y_offset = ((Y2 - Y1) // 2) - 30
-            # X1 Tilt check
-            X_tc = X2 - 50
-            change_config_file(config_file_path, 'TILT_CHECK_X1', X_tc)
-            change_config_file(config_file_path, 'TILT_CHECK_X2', X2)
-
-            Y1t_tc = Y1 + 25
-            Y2t_tc = Y1 + Y_offset
-            change_config_file(config_file_path, 'TILT_CHECK_TOP_Y1', Y1t_tc)
-            change_config_file(config_file_path, 'TILT_CHECK_TOP_Y2', Y2t_tc)
-
-            Y1b_tc = Y2 - Y_offset
-            Y2b_tc = Y2 - 25
+            line = image_in_canvas.draw_new_line(X1, Y, X2, Y)
             change_config_file(
-                config_file_path, 'TILT_CHECK_BOTTOM_Y1', Y1b_tc)
+                config_file_path, 'X_CENTER', str(x_center_in.get()))
             change_config_file(
-                config_file_path, 'TILT_CHECK_BOTTOM_Y2', Y2b_tc)
+                config_file_path, 'Y_CENTER', str(y_center_in.get()))
+            change_config_file(config_file_path, 'INPUT_ROI_HEIGHT', str(roi_height_in.get()))
+            change_config_file(config_file_path, 'INPUT_ROI_WIDTH', str(roi_width_in.get()))
+        else:
+            print('Pass')
+            return
+        # Y & B should be within x amount of degrees off
+        Y1 = Y - height
+        Y2 = Y + height
 
-            # Y top Pin check
-            Yt_pc = Y1 + Y_offset
-            change_config_file(config_file_path, 'PIN_CHECK_TOP_Y1', Y1)
-            change_config_file(config_file_path, 'PIN_CHECK_TOP_Y2', Yt_pc)
+        change_config_file(config_file_path, 'DEFAULT_ROI_Y1', Y1)
+        change_config_file(config_file_path, 'DEFAULT_ROI_Y2', Y2)
 
-            Yb_pc = Y2 - Y_offset
-            change_config_file(config_file_path, 'PIN_CHECK_BOTTOM_Y1', Yb_pc)
-            change_config_file(config_file_path, 'PIN_CHECK_BOTTOM_Y2', Y2)
-        elif ltr:
-            print('no, no, no, you didnt say the magic word')
-    except Exception as e:
-        print('No new points')
-        print(e)
+        print('Y1: {}, Y2: {}, X1: {}, X2: {}'.format(Y1, Y2, X1, X2))
+
+        big_box = image_in_canvas.create_big_box(X1, Y1, X2, Y2)
+        change_config_file(config_file_path, 'BIG_BOX_X1', X1)
+        change_config_file(config_file_path, 'BIG_BOX_X2', X2)
+        change_config_file(config_file_path, 'BIG_BOX_Y1', Y1)
+        change_config_file(config_file_path, 'BIG_BOX_Y2', Y2)
+
+        small_box = image_in_canvas.create_small_box(X, Y)
+        change_config_file(config_file_path, 'BOX_X_IN', X)
+        change_config_file(config_file_path, 'BOX_Y_IN', Y)
+
+        new_crop = image_in_canvas.get_image(X1, X2, Y1, Y2)
+        current_crop_label.config(image=new_crop)
+        current_crop_title.config(
+            text='Current Crop', font=('helvetica', 14))
+
+        bbo = (X2 - X1) // 3
+
+        Xt = X1 + bbo
+        change_config_file(config_file_path, 'PIN_TIP_X1', X1)
+        change_config_file(config_file_path, 'PIN_TIP_X2', Xt)
+
+        Xb = Xt + bbo
+        change_config_file(config_file_path, 'PIN_BODY_X1', Xt)
+        change_config_file(config_file_path, 'PIN_BODY_X2', Xb)
+
+        Xc = Xb
+        change_config_file(config_file_path, 'PIN_BASE_X1', Xc)
+        change_config_file(config_file_path, 'PIN_BASE_X2', X2)
+
+        Y_offset = ((Y2 - Y1) // 2) - 35
+        # X1 Tilt check
+        X_tc = X2 - 50
+        change_config_file(config_file_path, 'TILT_CHECK_X1', X_tc)
+        change_config_file(config_file_path, 'TILT_CHECK_X2', X2)
+
+        Y1t_tc = Y1 + 20
+        Y2t_tc = Y1 + Y_offset
+        change_config_file(config_file_path, 'TILT_CHECK_TOP_Y1', Y1t_tc)
+        change_config_file(config_file_path, 'TILT_CHECK_TOP_Y2', Y2t_tc)
+
+        Y1b_tc = Y2 - Y_offset
+        Y2b_tc = Y2 - 20
+        change_config_file(
+            config_file_path, 'TILT_CHECK_BOTTOM_Y1', Y1b_tc)
+        change_config_file(
+            config_file_path, 'TILT_CHECK_BOTTOM_Y2', Y2b_tc)
+
+        # Y top Pin check
+        Yt_pc = Y1 + Y_offset
+        change_config_file(config_file_path, 'PIN_CHECK_TOP_Y1', Y1)
+        change_config_file(config_file_path, 'PIN_CHECK_TOP_Y2', Yt_pc)
+
+        Yb_pc = Y2 - Y_offset
+        change_config_file(config_file_path, 'PIN_CHECK_BOTTOM_Y1', Yb_pc)
+        change_config_file(config_file_path, 'PIN_CHECK_BOTTOM_Y2', Y2)
+        auto_start_on_off = False
+    elif ltr:
+        print("##### TODO #####")
+    else:
+        print('pass')
 
     pin_tip_button.bind("<Button-1>", lambda event,
                         arg=image_in_canvas: crop_button_left(event, image_in_canvas, 0))
@@ -351,6 +385,8 @@ def auto_submit_button_left(event, image_in_canvas):
 
 if __name__ == '__main__':
     root = tk.Tk()
+    auto_start_on_off = False
+    root_menu = Window_Menu(root)
     root.bind('<Motion>', motion)
     toolbar = tk.Frame(root)
     toolbar.pack(side="top", fill="x")
@@ -373,15 +409,14 @@ if __name__ == '__main__':
 
     ########################### Toolbar Canvas ############################
     refresh_button = tk.Button(root, text="Refresh", command=lambda: print(
-        'goodbye cruel world'),  bg='green', fg='white', font=10)
+        'Fix'),  bg='green', fg='white', font=10)
     refresh_button.pack(in_=toolbar, side="left", padx=10)
 
     manual_button = tk.Button(root, text='Manual', command=lambda: image_in_canvas.start_self_crop(),
                               bg='green', fg='white', font=10)
     manual_button.pack(in_=toolbar, side="left", padx=10)
 
-    clear_button = tk.Button(text='Clear', command=lambda: print(
-        'clear'), bg='green', fg='white', font=10)
+    clear_button = tk.Button(text='Clear', command=lambda: clear_image_canvas(image_in_canvas), bg='green', fg='white', font=10)
     clear_button.pack(in_=toolbar, side="left", padx=10)
 
     small_box_button = tk.Button(
@@ -435,52 +470,66 @@ if __name__ == '__main__':
     info_canvas_top.create_window(310, 315, window=pixel_per_mm_label)
     info_canvas_top.create_window(310, 335, window=pixel_per_mm_box)
 
-    axis_up_label = tk.Label(root, text='Set Axis Up')
-    axis_up_label.config(font=('helvetica', 10))
+    roi_width_label = tk.Label(root, text='Total Width')
+    roi_width_label.config(font=('helvetica', 10))
+    roi_width_in = tk.Entry(root, justify='center', width=15)
+    roi_width_in.insert(END, str(INPUT_ROI_WIDTH))
+    info_canvas_top.create_window(520, 315, window=roi_width_label)
+    info_canvas_top.create_window(520, 335, window=roi_width_in)
 
-    axis_choice = None
-    if PIN_ALIGN_Y_UP:
-        axis_choice = 0
-    elif PIN_ALIGN_Z_UP:
-        axis_choice = 1
-    axis_up_in = tk.StringVar()
-    axis_up_box = ttk.Combobox(
-        root, width=15, height=10, textvariable=axis_up_in, justify='center')
-    axis_up_box['values'] = ['Y Axis Up', 'Z Axis Up']
-    axis_up_box['state'] = 'readonly'
-    axis_up_box.current(axis_choice)
-    info_canvas_top.create_window(520, 315, window=axis_up_label)
-    info_canvas_top.create_window(520, 335, window=axis_up_box)
+    x_center_label = tk.Label(root, text='X Center Point')
+    x_center_label.config(font=('helvetica', 10))
+    x_center_in = tk.Entry(root, justify='center', width=15)
+    x_center_in.insert(END, str(X_CENTER))
+    info_canvas_top.create_window(90, 390, window=x_center_label)
+    info_canvas_top.create_window(90, 410, window=x_center_in)
 
-    height_center_label = tk.Label(root, text='Height Center')
-    height_center_label.config(font=('helvetica', 10))
-    height_center_in = tk.Entry(root, justify='center', width=15)
-    height_center_in.insert(END, str(DEFAULT_IMAGE_HEIGHT_CENTER))
-    info_canvas_top.create_window(90, 390, window=height_center_label)
-    info_canvas_top.create_window(90, 410, window=height_center_in)
-
-    width_center_label = tk.Label(root, text='Width Center')
-    width_center_label.config(font=('helvetica', 10))
-    width_center_in = tk.Entry(root, justify='center', width=15)
-    width_center_in.insert(END, str(DEFAULT_IMAGE_WIDTH_CENTER))
-    info_canvas_top.create_window(310, 390, window=width_center_label)
-    info_canvas_top.create_window(310, 410, window=width_center_in)
+    y_center_label = tk.Label(root, text='Y Center Point')
+    y_center_label.config(font=('helvetica', 10))
+    y_center_in = tk.Entry(root, justify='center', width=15)
+    y_center_in.insert(END, str(Y_CENTER))
+    info_canvas_top.create_window(310, 390, window=y_center_label)
+    info_canvas_top.create_window(310, 410, window=y_center_in)
 
     roi_height_label = tk.Label(root, text='ROI Height')
     roi_height_label.config(font=('helvetica', 10))
     roi_height_in = tk.Entry(root, justify='center', width=15)
-    roi_height_current = DEFAULT_ROI_Y2 - DEFAULT_ROI_Y1
-    roi_height_in.insert(END, str(roi_height_current))
+    roi_height_in.insert(END, str(INPUT_ROI_HEIGHT))
     info_canvas_top.create_window(520, 390, window=roi_height_label)
     info_canvas_top.create_window(520, 410, window=roi_height_in)
 
-    roi_width_label = tk.Label(root, text='Total Width')
-    roi_width_label.config(font=('helvetica', 10))
-    roi_width_in = tk.Entry(root, justify='center', width=15)
-    roi_width_current = BIG_BOX_X2 - BIG_BOX_X1
-    roi_width_in.insert(END, str(roi_width_current))
-    info_canvas_top.create_window(310, 465, window=roi_width_label)
-    info_canvas_top.create_window(310, 485, window=roi_width_in)
+    x_pos_dir_label = tk.Label(root, text='X Positive Direction')
+    x_pos_dir_label.config(font=('helvetica', 10))
+    x_pos_dir_in = tk.StringVar()
+    x_pos_dir_box = ttk.Combobox(
+        root, width=15, height=10, textvariable=x_pos_dir_in, justify='center')
+    x_pos_dir_box['values'] = ['LEFT', 'RIGHT']
+    x_pos_dir_box['state'] = 'readonly'
+    x_pos_dir_box.set(str(X_POS_DIR))
+    info_canvas_top.create_window(90, 465, window=x_pos_dir_label)
+    info_canvas_top.create_window(90, 485, window=x_pos_dir_box)
+
+    y_pos_dir_label = tk.Label(root, text='Y Positive Direction')
+    y_pos_dir_label.config(font=('helvetica', 10))
+    y_pos_dir_in = tk.StringVar()
+    y_pos_dir_box = ttk.Combobox(
+        root, width=15, height=10, textvariable=y_pos_dir_in, justify='center')
+    y_pos_dir_box['values'] = ['UP', 'DOWN']
+    y_pos_dir_box['state'] = 'readonly'
+    y_pos_dir_box.set(str(Y_POS_DIR))
+    info_canvas_top.create_window(310, 465, window=y_pos_dir_label)
+    info_canvas_top.create_window(310, 485, window=y_pos_dir_box)
+
+    z_pos_dir_label = tk.Label(root, text='Z Positive Direction')
+    z_pos_dir_label.config(font=('helvetica', 10))
+    z_pos_dir_in = tk.StringVar()
+    z_pos_dir_box = ttk.Combobox(
+        root, width=15, height=10, textvariable=z_pos_dir_in, justify='center')
+    z_pos_dir_box['values'] = ['UP', 'DOWN']
+    z_pos_dir_box['state'] = 'readonly'
+    z_pos_dir_box.set(str(Z_POS_DIR))
+    info_canvas_top.create_window(520, 465, window=z_pos_dir_label)
+    info_canvas_top.create_window(520, 485, window=z_pos_dir_box)
 
     current_crop_title = tk.Label(root, text='Current Crop')
     current_crop_title.config(font=('helvetica', 14))
@@ -497,21 +546,21 @@ if __name__ == '__main__':
 
     min_x_label = tk.Label(root, text='Min X')
     min_x_label.config(font=('helvetica', 14))
-    min_x_in = tk.Entry(root, justify='center', width=15)
+    min_x_in = tk.Entry(root, justify='center', width=10)
     min_x_in.insert(END, str(MIN_X))
     info_canvas_top.create_window(90, 25, window=min_x_label)
     info_canvas_top.create_window(90, 45, window=min_x_in)
 
     min_y_label = tk.Label(root, text='Min Y')
     min_y_label.config(font=('helvetica', 14))
-    min_y_in = tk.Entry(root, justify='center', width=15)
+    min_y_in = tk.Entry(root, justify='center', width=10)
     min_y_in.insert(END, str(MIN_Y))
     info_canvas_top.create_window(90, 125, window=min_y_label)
     info_canvas_top.create_window(90, 145, window=min_y_in)
 
     min_z_label = tk.Label(root, text='Min Z')
     min_z_label.config(font=('helvetica', 14))
-    min_z_in = tk.Entry(root, justify='center', width=15)
+    min_z_in = tk.Entry(root, justify='center', width=10)
     min_z_in.insert(END, str(MIN_Z))
     info_canvas_top.create_window(90, 225, window=min_z_label)
     info_canvas_top.create_window(90, 245, window=min_z_in)
@@ -520,21 +569,21 @@ if __name__ == '__main__':
 
     max_x_label = tk.Label(root, text='Max X')
     max_x_label.config(font=('helvetica', 14))
-    max_x_in = tk.Entry(root, justify='center', width=15)
+    max_x_in = tk.Entry(root, justify='center', width=10)
     max_x_in.insert(END, str(MAX_X))
     info_canvas_top.create_window(525, 25, window=max_x_label)
     info_canvas_top.create_window(525, 45, window=max_x_in)
 
     max_y_label = tk.Label(root, text='Max Y')
     max_y_label.config(font=('helvetica', 14))
-    max_y_in = tk.Entry(root, justify='center', width=15)
+    max_y_in = tk.Entry(root, justify='center', width=10)
     max_y_in.insert(END, str(MAX_Y))
     info_canvas_top.create_window(525, 125, window=max_y_label)
     info_canvas_top.create_window(525, 145, window=max_y_in)
 
     max_z_label = tk.Label(root, text='Max Z')
     max_z_label.config(font=('helvetica', 14))
-    max_z_in = tk.Entry(root, justify='center', width=15)
+    max_z_in = tk.Entry(root, justify='center', width=10)
     max_z_in.insert(END, str(MAX_Z))
     info_canvas_top.create_window(525, 225, window=max_z_label)
     info_canvas_top.create_window(525, 245, window=max_z_in)
