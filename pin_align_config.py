@@ -2,9 +2,9 @@
 
 DEFAULT_PIXELS_PER_MM = 20
 ROD_LENGTH = 18
-X_POS_DIR = 'LEFT'
-Y_POS_DIR = 'UP'
-Z_POS_DIR = 'DOWN'
+X_POS = True
+Y_POS = False
+Z_POS = True
 PIN_ALIGN_Y_UP = True
 PIN_ALIGN_Z_UP = False
 

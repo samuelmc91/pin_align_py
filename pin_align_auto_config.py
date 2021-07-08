@@ -207,17 +207,17 @@ def auto_submit_button_left(event, image_in_canvas):
     rod_length = pin_length_box.get().split(' ')[0]
     change_config_file(config_file_path, 'ROD_LENGTH', rod_length)
 
-    change_config_file(config_file_path, 'X_POS_DIR',
-                       str("'" + x_pos_dir_in.get()) + "'")
-    change_config_file(config_file_path, 'Y_POS_DIR',
-                       str("'" + y_pos_dir_in.get()) + "'")
-    change_config_file(config_file_path, 'Z_POS_DIR',
-                       str("'" + z_pos_dir_in.get()) + "'")
+    change_config_file(config_file_path, 'X_POS',
+                       str(x_pos_in.get()))
+    change_config_file(config_file_path, 'Y_POS',
+                       str(y_pos_in.get()))
+    change_config_file(config_file_path, 'Z_POS',
+                       str(z_pos_in.get()))
 
-    if X_POS_DIR == 'LEFT':
+    if X_POS:
         # The cap is on the right and the pin goes to the left
         rtl = True
-    elif X_POS_DIR == 'RIGHT':
+    elif not X_POS:
         ltr = True
 
     if rtl:
@@ -498,38 +498,38 @@ if __name__ == '__main__':
     info_canvas_top.create_window(520, 390, window=roi_height_label)
     info_canvas_top.create_window(520, 410, window=roi_height_in)
 
-    x_pos_dir_label = tk.Label(root, text='X Positive Direction')
-    x_pos_dir_label.config(font=('helvetica', 10))
-    x_pos_dir_in = tk.StringVar()
-    x_pos_dir_box = ttk.Combobox(
-        root, width=15, height=10, textvariable=x_pos_dir_in, justify='center')
-    x_pos_dir_box['values'] = ['LEFT', 'RIGHT']
-    x_pos_dir_box['state'] = 'readonly'
-    x_pos_dir_box.set(str(X_POS_DIR))
-    info_canvas_top.create_window(90, 465, window=x_pos_dir_label)
-    info_canvas_top.create_window(90, 485, window=x_pos_dir_box)
+    x_pos_label = tk.Label(root, text='X Positive')
+    x_pos_label.config(font=('helvetica', 10))
+    x_pos_in = tk.StringVar()
+    x_pos_box = ttk.Combobox(
+        root, width=15, height=10, textvariable=x_pos_in, justify='center')
+    x_pos_box['values'] = ['True', 'False']
+    x_pos_box['state'] = 'readonly'
+    x_pos_box.set(str(X_POS))
+    info_canvas_top.create_window(90, 465, window=x_pos_label)
+    info_canvas_top.create_window(90, 485, window=x_pos_box)
 
-    y_pos_dir_label = tk.Label(root, text='Y Positive Direction')
-    y_pos_dir_label.config(font=('helvetica', 10))
-    y_pos_dir_in = tk.StringVar()
-    y_pos_dir_box = ttk.Combobox(
-        root, width=15, height=10, textvariable=y_pos_dir_in, justify='center')
-    y_pos_dir_box['values'] = ['UP', 'DOWN']
-    y_pos_dir_box['state'] = 'readonly'
-    y_pos_dir_box.set(str(Y_POS_DIR))
-    info_canvas_top.create_window(310, 465, window=y_pos_dir_label)
-    info_canvas_top.create_window(310, 485, window=y_pos_dir_box)
+    y_pos_label = tk.Label(root, text='Y Positive')
+    y_pos_label.config(font=('helvetica', 10))
+    y_pos_in = tk.StringVar()
+    y_pos_box = ttk.Combobox(
+        root, width=15, height=10, textvariable=y_pos_in, justify='center')
+    y_pos_box['values'] = ['True', 'False']
+    y_pos_box['state'] = 'readonly'
+    y_pos_box.set(str(Y_POS))
+    info_canvas_top.create_window(310, 465, window=y_pos_label)
+    info_canvas_top.create_window(310, 485, window=y_pos_box)
 
-    z_pos_dir_label = tk.Label(root, text='Z Positive Direction')
-    z_pos_dir_label.config(font=('helvetica', 10))
-    z_pos_dir_in = tk.StringVar()
-    z_pos_dir_box = ttk.Combobox(
-        root, width=15, height=10, textvariable=z_pos_dir_in, justify='center')
-    z_pos_dir_box['values'] = ['UP', 'DOWN']
-    z_pos_dir_box['state'] = 'readonly'
-    z_pos_dir_box.set(str(Z_POS_DIR))
-    info_canvas_top.create_window(520, 465, window=z_pos_dir_label)
-    info_canvas_top.create_window(520, 485, window=z_pos_dir_box)
+    z_pos_label = tk.Label(root, text='Z Positive')
+    z_pos_label.config(font=('helvetica', 10))
+    z_pos_in = tk.StringVar()
+    z_pos_box = ttk.Combobox(
+        root, width=15, height=10, textvariable=z_pos_in, justify='center')
+    z_pos_box['values'] = ['True', 'False']
+    z_pos_box['state'] = 'readonly'
+    z_pos_box.set(str(Z_POS))
+    info_canvas_top.create_window(520, 465, window=z_pos_label)
+    info_canvas_top.create_window(520, 485, window=z_pos_box)
 
     current_crop_title = tk.Label(root, text='Current Crop')
     current_crop_title.config(font=('helvetica', 14))
